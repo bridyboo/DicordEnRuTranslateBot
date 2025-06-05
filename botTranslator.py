@@ -3,6 +3,7 @@
 import discord
 import os
 import re
+import asyncio
 from dotenv import load_dotenv
 from googletrans import Translator
 
@@ -19,6 +20,12 @@ intents.message_content = True
 
 client = discord.Client(intents=intents)
 
+async def detect_language(text):
+    return await asyncio.to_thread(translator.detect, text)
+
+async def translate_text(text, dest):
+    return await asyncio.to_thread(translator.translate, text, dest=dest)
+
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user}')
@@ -32,24 +39,24 @@ async def on_message(message):
     if re.search(r'http[s]?://', message.content):
         return
 
-    # Skip empty or emoji-only messages
-    if not message.content.strip() or message.content.strip().isascii() == False:
+    # Skip empty messages or messages without any alphanumeric characters
+    if not message.content.strip() or not any(char.isalnum() for char in message.content):
         return
 
     try:
-        detected = translator.detect(message.content)
+        detected = await detect_language(message.content)
         print(f"Detected language: {detected.lang}")
 
         if detected.lang == 'en':
-            translated = translator.translate(message.content, dest='ru')
+            translated = await translate_text(message.content, dest='ru')
             await message.channel.send(f"🇬🇧➡️🇷🇺 {translated.text}")
 
         elif detected.lang == 'ru':
-            translated = translator.translate(message.content, dest='en')
+            translated = await translate_text(message.content, dest='en')
             await message.channel.send(f"🇷🇺➡️🇬🇧 {translated.text}")
 
         else:
-            print("Message language is neither English nor Russian — skipping.")
+            print(f"No translation needed for detected language: {detected.lang}")
 
     except Exception as e:
         print(f"Translation error: {e}")
